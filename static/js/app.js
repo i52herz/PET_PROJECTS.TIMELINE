@@ -455,20 +455,88 @@
                 return { x: node.x + node.width / 2, y: node.y + node.height / 2 };
             }
 
-            function buildCurve(fromNode, toNode) {
+            function sidePoint(node, side) {
+                const c = getNodeCenter(node);
+                switch (side) {
+                    case 'top': return { x: c.x, y: node.y };
+                    case 'bottom': return { x: c.x, y: node.y + node.height };
+                    case 'left': return { x: node.x, y: c.y };
+                    case 'right': return { x: node.x + node.width, y: c.y };
+                }
+            }
+
+            function sideNormal(side) {
+                switch (side) {
+                    case 'top': return { x: 0, y: -1 };
+                    case 'bottom': return { x: 0, y: 1 };
+                    case 'left': return { x: -1, y: 0 };
+                    case 'right': return { x: 1, y: 0 };
+                }
+            }
+
+            function pickSides(fromNode, toNode) {
+                const fx1 = fromNode.x, fy1 = fromNode.y;
+                const fx2 = fromNode.x + fromNode.width, fy2 = fromNode.y + fromNode.height;
+                const tx1 = toNode.x, ty1 = toNode.y;
+                const tx2 = toNode.x + toNode.width, ty2 = toNode.y + toNode.height;
+                const hOverlap = Math.min(fx2, tx2) - Math.max(fx1, tx1);
+                const vOverlap = Math.min(fy2, ty2) - Math.max(fy1, ty1);
                 const fromCenter = getNodeCenter(fromNode);
                 const toCenter = getNodeCenter(toNode);
-                const startX = fromNode.x + fromNode.width;
-                const startY = fromCenter.y;
-                const endX = toNode.x;
-                const endY = toCenter.y;
-                const dx = Math.max(90, Math.abs(endX - startX) * 0.45);
-                const endXAdjusted = endX - 6;
+                const dx = toCenter.x - fromCenter.x;
+                const dy = toCenter.y - fromCenter.y;
+
+                let fromSide, toSide;
+                if (vOverlap > 0) {
+                    fromSide = dx >= 0 ? 'right' : 'left';
+                    toSide = dx >= 0 ? 'left' : 'right';
+                } else if (hOverlap > 0) {
+                    fromSide = dy >= 0 ? 'bottom' : 'top';
+                    toSide = dy >= 0 ? 'top' : 'bottom';
+                } else if (Math.abs(dx) > Math.abs(dy)) {
+                    fromSide = dx >= 0 ? 'right' : 'left';
+                    toSide = dx >= 0 ? 'left' : 'right';
+                } else {
+                    fromSide = dy >= 0 ? 'bottom' : 'top';
+                    toSide = dy >= 0 ? 'top' : 'bottom';
+                }
+                return { fromSide, toSide };
+            }
+
+            function pickSideToward(center, node, target) {
+                const dx = target.x - center.x;
+                const dy = target.y - center.y;
+                const tRight = dx > 0 ? (node.width / 2) / dx : Infinity;
+                const tLeft = dx < 0 ? (-node.width / 2) / dx : Infinity;
+                const tBottom = dy > 0 ? (node.height / 2) / dy : Infinity;
+                const tTop = dy < 0 ? (-node.height / 2) / dy : Infinity;
+                const minT = Math.min(tRight, tLeft, tBottom, tTop);
+                if (minT === tRight) return 'right';
+                if (minT === tLeft) return 'left';
+                if (minT === tBottom) return 'bottom';
+                return 'top';
+            }
+
+            function curvePath(start, end, n1, n2, inset, bend) {
+                const dist = Math.hypot(end.x - start.x, end.y - start.y);
+                if (bend === undefined) bend = Math.max(60, Math.min(220, dist * 0.45));
+                const c1 = { x: start.x + n1.x * bend, y: start.y + n1.y * bend };
+                const endAdjusted = n2 ? { x: end.x - n2.x * inset, y: end.y - n2.y * inset } : end;
+                const c2 = n2
+                    ? { x: endAdjusted.x + n2.x * bend, y: endAdjusted.y + n2.y * bend }
+                    : { x: end.x - n1.x * bend, y: end.y - n1.y * bend };
                 return {
-                    d: `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endXAdjusted - dx} ${endY}, ${endXAdjusted} ${endY}`,
-                    midX: (startX + endXAdjusted) / 2,
-                    midY: (startY + endY) / 2,
+                    d: `M ${start.x} ${start.y} C ${c1.x} ${c1.y}, ${c2.x} ${c2.y}, ${endAdjusted.x} ${endAdjusted.y}`,
+                    midX: (start.x + endAdjusted.x) / 2,
+                    midY: (start.y + endAdjusted.y) / 2,
                 };
+            }
+
+            function buildCurve(fromNode, toNode) {
+                const { fromSide, toSide } = pickSides(fromNode, toNode);
+                const start = sidePoint(fromNode, fromSide);
+                const end = sidePoint(toNode, toSide);
+                return curvePath(start, end, sideNormal(fromSide), sideNormal(toSide), 6);
             }
 
             function fitTitle(el) {
@@ -615,24 +683,23 @@
                 if (state.previewLink?.fromId && state.previewLink.pointer) {
                     const fromNode = getNodeById(state.previewLink.fromId);
                     if (fromNode) {
+                        const pointerWorld = screenToWorld(state.previewLink.pointer.x, state.previewLink.pointer.y);
                         const fromCenter = getNodeCenter(fromNode);
-                        const startX = fromNode.x + fromNode.width;
-                        const startY = fromCenter.y;
+                        const startSide = pickSideToward(fromCenter, fromNode, pointerWorld);
+                        const start = sidePoint(fromNode, startSide);
                         const endNode = state.previewLink.targetId ? getNodeById(state.previewLink.targetId) : null;
-                        let endX, endY;
+                        let endPoint, n2 = null;
                         if (endNode) {
                             const ec = getNodeCenter(endNode);
-                            endX = endNode.x;
-                            endY = ec.y;
+                            const endSide = pickSideToward(ec, endNode, pointerWorld);
+                            endPoint = sidePoint(endNode, endSide);
+                            n2 = sideNormal(endSide);
                         } else {
-                            const pointerWorld = screenToWorld(state.previewLink.pointer.x, state.previewLink.pointer.y);
-                            endX = pointerWorld.x;
-                            endY = pointerWorld.y;
+                            endPoint = pointerWorld;
                         }
-                        const dx = Math.max(90, Math.abs(endX - startX) * 0.45);
+                        const curve = curvePath(start, endPoint, sideNormal(startSide), n2, 6);
                         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                        path.setAttribute('d',
-                            `M ${startX} ${startY} C ${startX + dx} ${startY}, ${endX - dx} ${endY}, ${endX} ${endY}`);
+                        path.setAttribute('d', curve.d);
                         path.setAttribute('class', 'link-path is-preview' + (endNode ? ' is-snapped' : ''));
                         linkLayer.appendChild(path);
                     }
@@ -803,14 +870,15 @@
                     const to = getNodeById(link.to);
                     if (!from || !to) return;
                     const line = document.createElementNS(svgNS, 'path');
-                    const fc = getNodeCenter(from);
-                    const tc = getNodeCenter(to);
-                    const sx = (from.x + from.width) * sc + offsetX;
-                    const sy = fc.y * sc + offsetY;
-                    const ex = to.x * sc + offsetX;
-                    const ey = tc.y * sc + offsetY;
-                    const dx = Math.max(15, Math.abs(ex - sx) * 0.42);
-                    line.setAttribute('d', `M ${sx} ${sy} C ${sx + dx} ${sy}, ${ex - dx} ${ey}, ${ex} ${ey}`);
+                    const { fromSide, toSide } = pickSides(from, to);
+                    const start = sidePoint(from, fromSide);
+                    const end = sidePoint(to, toSide);
+                    const p1 = { x: start.x * sc + offsetX, y: start.y * sc + offsetY };
+                    const p2 = { x: end.x * sc + offsetX, y: end.y * sc + offsetY };
+                    const n1 = { x: sideNormal(fromSide).x * sc, y: sideNormal(fromSide).y * sc };
+                    const n2 = { x: sideNormal(toSide).x * sc, y: sideNormal(toSide).y * sc };
+                    const bend = Math.max(60, Math.min(220, Math.hypot(end.x - start.x, end.y - start.y) * 0.45)) * sc;
+                    line.setAttribute('d', curvePath(p1, p2, n1, n2, 0, bend).d);
                     line.setAttribute('class', 'mini-link');
                     miniMapSvg.appendChild(line);
                 });
