@@ -90,7 +90,7 @@ async def limit_payload_size(request: Request, call_next):
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/static"):
-        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        response.headers["Cache-Control"] = "no-cache"
     else:
         response.headers.setdefault("Cache-Control", "no-store")
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
