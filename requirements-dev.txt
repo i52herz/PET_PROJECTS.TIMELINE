@@ -12,10 +12,6 @@ certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
-colorama==0.4.6
-    # via
-    #   -c requirements.txt
-    #   pytest
 h11==0.16.0
     # via
     #   -c requirements.txt
@@ -41,7 +37,7 @@ pygments==2.20.0
     # via pytest
 pytest==9.1.1
     # via -r requirements-dev.in
-ruff==0.16.1
+ruff==0.16.3
     # via -r requirements-dev.in
 typing-extensions==4.16.0
     # via
