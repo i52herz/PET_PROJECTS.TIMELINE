@@ -16,8 +16,6 @@ anyio==4.14.2
     #   watchfiles
 click==8.4.2
     # via uvicorn
-colorama==0.4.6
-    # via click
 fastapi==0.141.1
     # via -r requirements.in
 greenlet==3.5.4
@@ -54,7 +52,7 @@ python-dotenv==1.2.2
     # via uvicorn
 pyyaml==6.0.3
     # via uvicorn
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
     # via
     #   -r requirements.in
     #   alembic
@@ -75,10 +73,10 @@ typing-inspection==0.4.2
     # via
     #   fastapi
     #   pydantic
-tzdata==2026.3
-    # via psycopg
 uvicorn[standard]==0.52.1
     # via -r requirements.in
+uvloop==0.22.1
+    # via uvicorn
 watchfiles==1.2.0
     # via uvicorn
 websockets==17.0.1
