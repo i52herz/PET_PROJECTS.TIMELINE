@@ -16,13 +16,11 @@ anyio==4.14.2
     #   watchfiles
 click==8.4.2
     # via uvicorn
-colorama==0.4.6
-    # via click
 fastapi==0.141.1
     # via -r requirements.in
 greenlet==3.5.4
     # via sqlalchemy
-gunicorn==23.0.0
+gunicorn==26.1.0
     # via -r requirements.in
 h11==0.16.0
     # via uvicorn
@@ -38,8 +36,6 @@ markupsafe==3.0.3
     # via
     #   jinja2
     #   mako
-packaging==26.3
-    # via gunicorn
 psycopg[binary]==3.3.4
     # via -r requirements.in
 psycopg-binary==3.3.4
@@ -75,10 +71,10 @@ typing-inspection==0.4.2
     # via
     #   fastapi
     #   pydantic
-tzdata==2026.3
-    # via psycopg
 uvicorn[standard]==0.52.1
     # via -r requirements.in
+uvloop==0.22.1
+    # via uvicorn
 watchfiles==1.2.0
     # via uvicorn
 websockets==17.0.1
